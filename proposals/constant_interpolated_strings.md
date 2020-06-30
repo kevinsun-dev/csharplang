@@ -1,8 +1,8 @@
 # Constant Interpolated Strings
 
 * [x] Proposed
-* [X] Prototype: [In Progress](https://github.com/kevinsun-dev/roslyn/tree/features/interpolated-string-constants)
-* [X] Implementation: [In Progress](https://github.com/dotnet/roslyn/tree/origin/features/interpolated-string-constants)
+* [X] Prototype: [In Progress](https://github.com/kevinsun-dev/roslyn/tree/origin/features/interpolated-string-constants)
+* [X] Implementation: [In Progress](https://github.com/dotnet/roslyn/tree/features/interpolated-string-constants)
 * [ ] Specification: [Not Started](pr/1)
 
 ## Summary
