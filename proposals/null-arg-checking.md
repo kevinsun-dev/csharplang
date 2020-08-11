@@ -16,12 +16,12 @@ of it. The syntax can be used independent of `#nullable` directives.
 ## Detailed Design 
 
 ### Null validation parameter syntax
-The bang operator, `!`, can be positioned after a parameter name in a parameter list and this will cause the C# 
-compiler to emit standard `null` checking code for that parameter. This is referred to as `null` validation parameter
-syntax. For example:
+Two bang operators, `!!`, can be positioned after a parameter name in a parameter list and this will cause the C# 
+compiler to emit `null` checking code for that parameter within a globally accessible method. This is referred to
+as `null` validation parameter syntax. For example:
 
 ``` csharp
-void M(string name!) {
+void M(string name!!) {
     ...
 }
 ```
@@ -29,36 +29,36 @@ void M(string name!) {
 Will be translated into:
 
 ``` csharp
-void M(string name) {
-    if (name is null) {
-        throw new ArgumentNullException(nameof(name));
+void CheckNull(object o){
+    if (o is null) {
+        throw new ArgumentNullException(nameof(o));
     }
+}
+
+void M(string name) {
+    CheckNull(name);
     ...
 }
 ```
 
 The generated `null` check will occur before any developer authored code in the method. When multiple parameters contain
-the `!` operator then the checks will occur in the same order as the parameters are declared.
+the `!!` operator then the checks will occur in the same order as the parameters are declared.
 
 ``` csharp
 void M(string p1, string p2) {
-    if (p1 is null) {
-        throw new ArgumentNullException(nameof(p1));
-    }
-    if (p2 is null) {
-        throw new ArgumentNullException(nameof(p2));
-    }
+    CheckNull(p1);
+    CheckNull(p2);
     ...
 }
 ```
 
 The check will be specifically for reference equality to `null`, it does not invoke `==` or any user defined operators. 
-This also means the `!` operator can only be added to parameters whose type can be tested for equality against `null`. 
+This also means the `!!` operator can only be added to parameters whose type can be tested for equality against `null`. 
 This means it can't be used on a parameter whose type is known to be a value type.
 
 ``` csharp
-// Error: Cannot use ! on parameters who types derive from System.ValueType
-void G<T>(T arg!) where T : struct {
+// Error: Cannot use !! on parameters who types derive from System.ValueType
+void G<T>(T arg!!) where T : struct {
 
 }
 ```
@@ -73,7 +73,7 @@ For example:
 ``` csharp
 class C {
     string field = GetString();
-    C(string name!): this(name) {
+    C(string name!!): this(name) {
         ...
     }
 }
@@ -84,9 +84,7 @@ Will be roughly translated into the following:
 ``` csharp
 class C {
     C(string name)
-        if (name is null) {
-            throw new ArgumentNullException(nameof(name));
-        }
+        CheckNull(name);
         field = GetString();
         :this(name);
         ...
@@ -101,7 +99,7 @@ parameter syntax that lacks parens.
 ``` csharp
 void G() {
     // An identity lambda which throws on a null input
-    Func<string, string> s = x! => x;
+    Func<string, string> s = x!! => x;
 }
 ```
 
@@ -111,7 +109,7 @@ or `async` iterators.
 
 ``` csharp
 class Iterators {
-    IEnumerable<char> GetCharacters(string s!) {
+    IEnumerable<char> GetCharacters(string s!!) {
         foreach (var c in s) {
             yield return c;
         }
@@ -124,7 +122,7 @@ class Iterators {
 }
 ```
 
-The `!` operator can only be used for parameter lists which have an associated method body. This
+The `!!` operator can only be used for parameter lists which have an associated method body. This
 means it cannot be used in an `abstract` method, `interface`, `delegate` or `partial` method 
 definition.
 
@@ -153,16 +151,16 @@ is instantiated as a value type the code will be evaluated as `false`. For cases
 code will do a proper `is null` check.
 
 ### Intersection with Nullable Reference Types
-Any parameter which has a `!` operator applied to it's name will start with the nullable state being not `null`. This is
+Any parameter which has a `!!` operator applied to it's name will start with the nullable state being not `null`. This is
 true even if the type of the parameter itself is potentially `null`. That can occur with an explicitly nullable type, 
 such as say `string?`, or with an unconstrained type parameter. 
 
-When a `!` syntax on parameters is combined with an explicitly nullable type on the parameter then a warning will
+When a `!!` syntax on parameters is combined with an explicitly nullable type on the parameter then a warning will
 be issued by the compiler:
 
 ``` csharp
 void WarnCase<T>(
-    string? name!, // Warning: combining explicit null checking with a nullable type
+    string? name!!, // Warning: combining explicit null checking with a nullable type
     T value1 // Okay
 )
 ```
@@ -174,7 +172,7 @@ None
 
 ### Constructors
 The code generation for constructors means there is a small, but observable, behavior change when moving from standard
-`null` validation today and the `null` validation parameter syntax (`!`). The `null` check in standard validation 
+`null` validation today and the `null` validation parameter syntax (`!!`). The `null` check in standard validation 
 occurs after both field initializers and any `base` or `this` calls. This means a developer can't necessarily migrate
 100% of their `null` validation to the new syntax. Constructors at least require some inspection.
 
@@ -182,8 +180,8 @@ After discussion though it was decided that this is very unlikely to cause any s
 logical that the `null` check run before any logic in the constructor does. Can revisit if significant compat issues
 are discovered.
 
-### Warning when mixing ? and !
-There was a lengthy discussion on whether or not a warning should be issued when the `!` syntax is applied to a
+### Warning when mixing ? and !!
+There was a lengthy discussion on whether or not a warning should be issued when the `!!` syntax is applied to a
 parameter which is explicitly typed to a nullable type. On the surface it seems like a nonsensical declaration by 
 the developer but there are cases where type hierarchies could force developers into such a situation. 
 
@@ -203,7 +201,7 @@ abstract class C2 : C1 {
 
 // Assembly3
 abstract class C3 : C2 { 
-    protected override void M(object o!) {
+    protected override void M(object o!!) {
         ...
     }
 }
@@ -232,7 +230,7 @@ following to eliminate it:
 ``` csharp
 // Assembly3
 abstract class C3 : C2 { 
-    protected override void M(object? o!) {
+    protected override void M(object? o!!) {
         ...
     }
 }
@@ -241,8 +239,8 @@ abstract class C3 : C2 {
 At this point the author of Assembly3 has a few choices:
 
 - They can accept / suppress the warning about `object?` and `object` mismatch.
-- They can accept / suppress the warning about `object?` and `!` mismatch.
-- They can just remove the `null` validation check (delete `!` and do explicit checking)
+- They can accept / suppress the warning about `object?` and `!!` mismatch.
+- They can just remove the `null` validation check (delete `!!` and do explicit checking)
 
 This is a real scenario but for now the idea is to move forward with the warning. If it turns out the warning happens
 more frequently than we anticipate then we can remove it later (the reverse is not true).
