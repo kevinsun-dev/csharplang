@@ -29,14 +29,17 @@ void M(string name!!) {
 Will be translated into:
 
 ``` csharp
-void CheckNull(object o){
-    if (o is null) {
-        throw new ArgumentNullException(nameof(o));
-    }
+internal static class ThrowHelpers
+{
+    internal static void ThrowArgNull(string name) => throw new ArgumentNullException(name);
 }
 
 void M(string name) {
-    CheckNull(name);
+    if (name is null)
+    {
+        ThrowHelpers.ThrowArgNull(nameof(name));
+        return;
+    }
     ...
 }
 ```
@@ -46,8 +49,16 @@ the `!!` operator then the checks will occur in the same order as the parameters
 
 ``` csharp
 void M(string p1, string p2) {
-    CheckNull(p1);
-    CheckNull(p2);
+    if (p1 is null)
+    {
+        ThrowHelpers.ThrowArgNull(nameof(p1));
+        return;
+    }
+    if (p2 is null)
+    {
+        ThrowHelpers.ThrowArgNull(nameof(p2));
+        return;
+    }
     ...
 }
 ```
@@ -84,7 +95,11 @@ Will be roughly translated into the following:
 ``` csharp
 class C {
     C(string name)
-        CheckNull(name);
+        if (name is null)
+        {
+            ThrowHelpers.ThrowArgNull(nameof(name));
+            return;
+        }
         field = GetString();
         :this(name);
         ...
